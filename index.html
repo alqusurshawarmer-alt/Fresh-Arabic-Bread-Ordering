@@ -813,8 +813,11 @@
 
     <!-- Change PIN -->
     <div class="card">
-      <div class="card-title">🔐 Change Manager PIN</div>
-      <div class="pin-change-form">
+      <div class="card-title" onclick="togglePinChange()" style="cursor:pointer;display:flex;justify-content:space-between;align-items:center;">
+        <span>🔐 Change Manager PIN</span>
+        <span id="pin-change-chevron" style="font-size:12px;color:var(--muted);transition:transform 0.2s;">▼</span>
+      </div>
+      <div class="pin-change-form" id="pin-change-form" style="display:none;">
         <div>
           <label>Current PIN</label>
           <input type="password" id="pin-current" maxlength="6" placeholder="••••" inputmode="numeric">
@@ -1356,6 +1359,14 @@ async function loadManagerData() {
 }
 
 // ─── Change PIN ───────────────────────────────────────────────────
+function togglePinChange() {
+  const form = document.getElementById('pin-change-form');
+  const chevron = document.getElementById('pin-change-chevron');
+  const isOpen = form.style.display !== 'none';
+  form.style.display = isOpen ? 'none' : 'flex';
+  chevron.style.transform = isOpen ? '' : 'rotate(180deg)';
+}
+
 function changePIN() {
   const current = document.getElementById('pin-current').value;
   const newPin  = document.getElementById('pin-new').value;
