@@ -14,14 +14,14 @@ from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.lib.enums import TA_CENTER, TA_RIGHT, TA_LEFT
 import arabic_reshaper
 from bidi.algorithm import get_display
- 
+
 app = Flask(__name__)
 CORS(app)
- 
+
 # Supabase config
 SUPABASE_URL = 'https://rgmmtroobtxltcyykxtl.supabase.co'
 SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJnbW10cm9vYnR4bHRjeXlreHRsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODUxODU2NTMsImV4cCI6MjEwMDc2MTY1M30.MxrlRj31hbPWVLJ3Fhw1h3q-vjdki3YNYpZqw9nGk-c'
- 
+
 # Store list — English name (must match Supabase) + Arabic name
 # UPDATED 2026-09: renamed 51→310 and 212→308
 STORES = [
@@ -38,7 +38,7 @@ STORES = [
     ("92-AlFaisalyah (Abu Bakr AlSdek St.)",            "الفيصلية - شارع أبو بكر الصديق"),
     ("53-Al Buhayrah",                                  "البحيرة"),
 ]
- 
+
 # Register Amiri font (files in same directory as app.py)
 font_dir = os.path.dirname(__file__)
 try:
@@ -50,8 +50,8 @@ except Exception as e:
     print(f"Warning: Could not load Amiri font: {e}")
     ARABIC_FONT = 'Helvetica'
     ARABIC_FONT_BOLD = 'Helvetica-Bold'
- 
- 
+
+
 def shape_arabic(text):
     """Reshape and apply bidi to Arabic text for correct rendering."""
     try:
@@ -59,8 +59,8 @@ def shape_arabic(text):
         return get_display(reshaped)
     except Exception:
         return text
- 
- 
+
+
 def fetch_orders(date_str):
     """Fetch all orders for a given date from Supabase."""
     url = (
@@ -75,27 +75,27 @@ def fetch_orders(date_str):
     except Exception as e:
         print(f"Supabase fetch error: {e}")
         return []
- 
- 
+
+
 @app.route('/health')
 def health():
     return jsonify({"status": "ok"})
- 
- 
+
+
 @app.route('/generate-pdf')
 def generate_pdf():
     date_str = request.args.get('date')
     if not date_str:
         return jsonify({"error": "date parameter required (YYYY-MM-DD)"}), 400
- 
+
     # Fetch orders
     orders_raw = fetch_orders(date_str)
- 
+
     # Build lookup: store_name → quantity
     order_map = {}
     for row in orders_raw:
         order_map[row.get('store_name', '')] = row.get('quantity', 0)
- 
+
     # Format date for display
     try:
         dt = datetime.strptime(date_str, '%Y-%m-%d')
@@ -104,7 +104,7 @@ def generate_pdf():
     except Exception:
         display_date = date_str
         display_date_ar = date_str
- 
+
     # --- Build PDF in memory ---
     buffer = io.BytesIO()
     doc = SimpleDocTemplate(
@@ -115,9 +115,9 @@ def generate_pdf():
         topMargin=15*mm,
         bottomMargin=15*mm,
     )
- 
+
     styles = getSampleStyleSheet()
- 
+
     # Custom styles
     title_style = ParagraphStyle(
         'TitleStyle',
@@ -174,9 +174,9 @@ def generate_pdf():
         fontSize=10,
         alignment=TA_CENTER,
     )
- 
+
     elements = []
- 
+
     # --- Logo ---
     logo_path = os.path.join(font_dir, 'logo.png')
     if os.path.exists(logo_path):
@@ -187,7 +187,7 @@ def generate_pdf():
             elements.append(Spacer(1, 3*mm))
         except Exception:
             pass
- 
+
     # --- Header ---
     elements.append(Paragraph("Shawarmer — Eastern Region (Dammam &amp; Khobar)", title_style))
     elements.append(Paragraph(shape_arabic("شاورمر - المنطقة الشرقية (الدمام والخبر)"), arabic_title_style))
@@ -198,21 +198,21 @@ def generate_pdf():
     elements.append(Paragraph(f"Order Date: {display_date}", subtitle_style))
     elements.append(Paragraph(shape_arabic(f"تاريخ الطلب: {display_date_ar}"), arabic_sub_style))
     elements.append(Spacer(1, 5*mm))
- 
+
     # --- Table ---
     # Header row
     header_en = Paragraph("<b>#</b>", cell_num_style)
     header_store_en = Paragraph("<b>Store (English)</b>", ParagraphStyle('H', parent=styles['Normal'], fontName='Helvetica-Bold', fontSize=9, alignment=TA_LEFT))
     header_store_ar = Paragraph(shape_arabic("<b>المتجر (عربي)</b>"), ParagraphStyle('H2', parent=styles['Normal'], fontName=ARABIC_FONT_BOLD, fontSize=9, alignment=TA_RIGHT))
     header_qty = Paragraph("<b>Packets</b>", ParagraphStyle('H3', parent=styles['Normal'], fontName='Helvetica-Bold', fontSize=9, alignment=TA_CENTER))
- 
+
     table_data = [[header_en, header_store_en, header_store_ar, header_qty]]
- 
+
     total = 0
     for i, (en_name, ar_name) in enumerate(STORES, start=1):
         qty = order_map.get(en_name, 0)
         total += qty
- 
+
         row_num = Paragraph(str(i), cell_num_style)
         row_en = Paragraph(en_name, cell_en_style)
         row_ar = Paragraph(shape_arabic(ar_name), cell_ar_style)
@@ -221,16 +221,16 @@ def generate_pdf():
             cell_num_style
         )
         table_data.append([row_num, row_en, row_ar, row_qty])
- 
+
     # Total row
     total_label_en = Paragraph("<b>TOTAL</b>", ParagraphStyle('Tot', parent=styles['Normal'], fontName='Helvetica-Bold', fontSize=10, alignment=TA_LEFT))
     total_label_ar = Paragraph(shape_arabic("<b>الإجمالي</b>"), ParagraphStyle('TotAr', parent=styles['Normal'], fontName=ARABIC_FONT_BOLD, fontSize=10, alignment=TA_RIGHT))
     total_qty = Paragraph(f"<b>{total}</b>", ParagraphStyle('TotQ', parent=styles['Normal'], fontName='Helvetica-Bold', fontSize=11, alignment=TA_CENTER))
     table_data.append(["", total_label_en, total_label_ar, total_qty])
- 
+
     # Column widths (page width ~180mm minus margins)
     col_widths = [10*mm, 72*mm, 72*mm, 22*mm]
- 
+
     t = Table(table_data, colWidths=col_widths, repeatRows=1)
     t.setStyle(TableStyle([
         # Header
@@ -253,10 +253,10 @@ def generate_pdf():
         ('LEFTPADDING', (0, 0), (-1, -1), 4),
         ('RIGHTPADDING', (0, 0), (-1, -1), 4),
     ]))
- 
+
     elements.append(t)
     elements.append(Spacer(1, 8*mm))
- 
+
     # Footer
     footer_style = ParagraphStyle(
         'Footer',
@@ -270,10 +270,10 @@ def generate_pdf():
         f"Generated by Shawarmer Bread Ordering System • {datetime.now().strftime('%Y-%m-%d %H:%M')} AST",
         footer_style
     ))
- 
+
     doc.build(elements)
     buffer.seek(0)
- 
+
     filename = f"shawarmer-bread-order-{date_str}.pdf"
     return send_file(
         buffer,
@@ -281,9 +281,8 @@ def generate_pdf():
         as_attachment=True,
         download_name=filename,
     )
- 
- 
+
+
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
     app.run(host='0.0.0.0', port=port)
- 
